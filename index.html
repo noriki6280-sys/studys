@@ -13,9 +13,7 @@
       display: flex;
       justify-content: center;
     }
-    .container {
-      width: 800px;
-    }
+    .container { width: 800px; }
     section { margin-bottom: 2rem; }
     textarea, input, select, button {
       font-size: 1rem;
@@ -31,6 +29,12 @@
     th, td {
       border: 1px solid #ccc;
       padding: 0.5rem;
+      vertical-align: top;
+    }
+    textarea.schedule-text {
+      width: 100%;
+      height: 3rem;
+      resize: vertical;
     }
     .entry {
       display: flex;
@@ -70,6 +74,28 @@
     }
     .sns-buttons a.line { background: #00b900; }
     .sns-buttons a.fb { background: #3b5998; }
+
+    /* ストップウォッチのスタイル */
+    .stopwatch {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .stopwatch-time {
+      font-size: 1.5rem;
+      width: 120px;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    /* コピー完了メッセージ */
+    .copy-message {
+      color: green;
+      font-size: 0.9rem;
+      display: none;
+      margin-top: 0.3rem;
+    }
   </style>
 </head>
 <body>
@@ -78,7 +104,7 @@
 
   <section>
     <h2>目標を設定しよう</h2>
-    <textarea id="memoInput" placeholder="例：『卒論のヒントを探す』など"></textarea>
+    <textarea id="memoInput" placeholder="例：『卒論のヒントを探す』『TOEICで700点を取る』などあなたの学修の目標を立てよう"></textarea>
     <div id="memoList"></div>
   </section>
 
@@ -94,8 +120,8 @@
       <tbody id="schedule-table">
         <tr>
           <td><input type="date" value=""></td>
-          <td><input type="text" placeholder="例：論文を調べる"></td>
-          <td><input type="text" placeholder="例：メモ帳＋翻訳サイト"></td>
+          <td><textarea class="schedule-text" placeholder="例：論文を調べる"></textarea></td>
+          <td><textarea class="schedule-text" placeholder="例：メモ帳＋翻訳サイト"></textarea></td>
         </tr>
       </tbody>
     </table>
@@ -115,6 +141,16 @@
   </section>
 
   <section>
+    <h2>ストップウォッチ（学習時間の目安に）</h2>
+    <div class="stopwatch">
+      <div id="timeDisplay" class="stopwatch-time">00:00:00</div>
+      <button onclick="startStopwatch()">▶ スタート</button>
+      <button onclick="stopStopwatch()">⏸ ストップ</button>
+      <button onclick="resetStopwatch()">🔁 リセット</button>
+    </div>
+  </section>
+
+  <section>
     <h2>今日の学びを振り返ろう</h2>
     <div id="entries">
       <div class="entry">
@@ -129,11 +165,14 @@
 
   <section>
     <h2>あなたの考えを共有しよう</h2>
-    <textarea id="postInput" placeholder="例：『自立した学修者に必要な力とは何か？』など"></textarea>
+    <textarea id="postInput" placeholder="学修した内容や考察を共有して新たな知見を得よう"></textarea>
+    <button onclick="copyPost()">コピーする</button>
+    <div class="copy-message" id="copyMessage">コピーしました！</div>
     <div id="postList"></div>
     <div class="sns-buttons">
       <a href="https://twitter.com/intent/tweet?text=" target="_blank">X</a>
       <a href="https://social-plugins.line.me/lineit/share?url=https://example.com" target="_blank" class="line">LINE</a>
+      <a href="https://discord.com/channels/@me" target="_blank" style="background:#5865F2;">Discord</a>
       <a href="https://www.facebook.com/sharer/sharer.php?u=https://example.com" target="_blank" class="fb">Facebook</a>
     </div>
   </section>
@@ -150,7 +189,7 @@
       const baseColors = ["#4e79a7", "#f28e2b", "#e15759", "#76b7b2", "#59a14f", "#edc948"];
       let colors = [];
       for (let i = 0; i < n; i++) {
-        colors.push(baseColors[i % baseColors.length] + (i >= baseColors.length ? Math.floor(i/baseColors.length) : ""));
+        colors.push(baseColors[i % baseColors.length]);
       }
       return colors;
     }
@@ -162,8 +201,8 @@
       const row = document.createElement('tr');
       row.innerHTML = `
         <td><input type="date" value="${today}"></td>
-        <td><input type="text" placeholder="学習内容"></td>
-        <td><input type="text" placeholder="方法・ツール"></td>
+        <td><textarea class="schedule-text" placeholder="学習内容"></textarea></td>
+        <td><textarea class="schedule-text" placeholder="方法・ツール"></textarea></td>
       `;
       table.appendChild(row);
     }
@@ -185,6 +224,30 @@
         toolBox.innerHTML = "";
       }
     });
+
+    // ストップウォッチ
+    let startTime, timerInterval;
+    function updateStopwatch() {
+      const elapsed = new Date(Date.now() - startTime);
+      const h = String(elapsed.getUTCHours()).padStart(2, "0");
+      const m = String(elapsed.getUTCMinutes()).padStart(2, "0");
+      const s = String(elapsed.getUTCSeconds()).padStart(2, "0");
+      document.getElementById("timeDisplay").textContent = `${h}:${m}:${s}`;
+    }
+    function startStopwatch() {
+      if (!timerInterval) {
+        startTime = Date.now();
+        timerInterval = setInterval(updateStopwatch, 1000);
+      }
+    }
+    function stopStopwatch() {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+    function resetStopwatch() {
+      stopStopwatch();
+      document.getElementById("timeDisplay").textContent = "00:00:00";
+    }
 
     // 調整
     const ctx = document.getElementById("studyChart").getContext("2d");
@@ -216,23 +279,29 @@
       chart.update();
     }
 
-    // 協働
-    const postInput = document.getElementById("postInput");
-    const postList = document.getElementById("postList");
+    // コピー機能（追加）
+    function copyPost() {
+      const text = document.getElementById("postInput").value;
+      navigator.clipboard.writeText(text).then(() => {
+        const msg = document.getElementById("copyMessage");
+        msg.style.display = "block";
+        setTimeout(() => msg.style.display = "none", 2000);
+      });
+    }
 
-    // 保存機能
+    // 保存
     function saveAll() {
       const today = new Date().toLocaleString();
       const memo = document.getElementById("memoInput").value.trim();
       const current = document.getElementById("currentStatus").value.trim();
       const schedules = Array.from(document.querySelectorAll("#schedule-table tr")).map(tr =>
-        Array.from(tr.querySelectorAll("input")).map(input => input.value)
+        Array.from(tr.querySelectorAll("input, textarea")).map(input => input.value)
       );
       const entries = Array.from(document.querySelectorAll("#entries .entry")).map(e => ({
         name: e.querySelector("input[type='text']").value,
         time: e.querySelector("input[type='number']").value
       }));
-      const post = postInput.value.trim();
+      const post = document.getElementById("postInput").value.trim();
 
       const saved = JSON.parse(localStorage.getItem("savedAll") || "[]");
       saved.unshift({ date: today, memo, current, schedules, entries, post });
@@ -267,10 +336,7 @@
       });
     }
 
-    // 初期化
-    window.onload = function() {
-      loadSaved();
-    };
+    window.onload = loadSaved;
   </script>
 </body>
 </html>
